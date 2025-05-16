@@ -1,0 +1,2 @@
+image: gitinsky/ebpf_exporter:603c9afe7ad098e89a711ac5692fac179024d083
+trafgenImage: gitinsky/sync-connect-trafgen:a6a472e7520defa6bd05b2bba9cfed424cf1cc65

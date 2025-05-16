@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ include "service.name" . }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "service.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "service.name" . }}
+    spec:
+      hostNetwork: true
+      imagePullSecrets:
+      - name: regcred
+      initContainers:
+      - name: copy-files-to-host
+        image: {{ .Values.image }}
+        command: ["sh", "-c"]
+        args:
+        - mkdir -p /host/monitoring/etc/ebpf_exporter && cp /ebpf_exporter /host/monitoring/ebpf_exporter && cp -r /etc/ebpf_exporter/* /host/monitoring/etc/ebpf_exporter/
+        volumeMounts:
+        - name: monitoring-dir
+          mountPath: /host/monitoring
+      containers:
+      - name: ebpf-exporter
+        image: {{ .Values.image }}
+        command:
+        - "nsenter"
+        - "--target"
+        - "1"
+        - "--mount"
+        - "--uts"
+        - "--ipc"
+        - "--net"
+        - "--pid"
+        - "--"
+        - "/monitoring/ebpf_exporter"
+        args:
+        - "--config.dir"
+        - "/monitoring/etc/ebpf_exporter"
+        - "--config.names"
+        - "biolatency,connect-latency,econnreset,econnrefused"
+        ports:
+        - name: exporter-port
+          containerPort: 9435
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: exporter-port
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: exporter-port
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: monitoring-dir
+          mountPath: /monitoring
+          readOnly: true
+        - name: host-root
+          mountPath: /host
+      volumes:
+      - name: monitoring-dir
+        hostPath:
+          path: /monitoring
+          type: DirectoryOrCreate
+      - name: host-root
+        hostPath:
+          path: /
+          type: DirectoryOrCreate
+      tolerations:
+      - operator: Exists

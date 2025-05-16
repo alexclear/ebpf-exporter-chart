@@ -1,0 +1,11 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "service.fullname" . }}
+spec:
+  podMetricsEndpoints:
+  - path: /metrics
+    port: exporter-port
+  selector:
+    matchLabels:
+      app: {{ include "service.name" . }}
